@@ -23,8 +23,8 @@ Base.metadata.create_all(engine)
 # Define the URL for the Twitter API request
 url = "https://api.twitter.com/2/users"
 
-# Fetch all users from the database
-users = session.query(User).all()
+# Fetch all users from the database with NULL in the specified fields
+users = session.query(User).filter(User.created_at.is_(None)).all()
 
 # Initialize the start time
 start_time = time.time()
@@ -55,7 +55,7 @@ for i, user in enumerate(users, start=1):
     # If the status code is 429, switch the token
     if response.status_code == 429:
         print(
-            "Rate limit reached. Switching tokens, committing changes, and escalating timeout."
+            f"Rate limit reached. Switching tokens, committing changes, and escalating timeout: {current_timeout}"
         )
         try:
             session.commit()
@@ -104,7 +104,7 @@ for i, user in enumerate(users, start=1):
     )
 
     # Wait for a second before making another request
-    time.sleep(0.01)
+    time.sleep(0.1)
 
 # Commit the changes and close the session
 try:
