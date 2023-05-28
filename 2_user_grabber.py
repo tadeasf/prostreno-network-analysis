@@ -21,8 +21,11 @@ headers = {
 # Fetch all users from the database
 users = session.query(User).all()
 
+# Initialize the start time
+start_time = time.time()
+
 # For each user, fetch their data from the Twitter API and update the database
-for user in users:
+for i, user in enumerate(users, start=1):
     params = {
         "ids": user.id,
         "user.fields": "description,location,public_metrics,created_at",
@@ -40,7 +43,6 @@ for user in users:
         break
 
     data = response.json()
-    print(data)
     # Update the user data in the database
     if "data" in data:
         user_data = data["data"][0]
@@ -55,6 +57,16 @@ for user in users:
             session.commit()
         except Exception as e:
             print(e)
+
+    # Calculate elapsed time and estimated time remaining
+    elapsed_time = time.time() - start_time
+    remaining_users = len(users) - i
+    estimated_time_remaining = (elapsed_time / i) * remaining_users
+
+    print(
+        f"Processed user {i} of {len(users)}. "
+        f"Estimated time remaining: {estimated_time_remaining} seconds."
+    )
 
     # Wait for a second before making another request
     time.sleep(1)

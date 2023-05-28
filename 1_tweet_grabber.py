@@ -29,7 +29,8 @@ time_periods = [
 query = "prostřeno OR prostreno OR Prostřeno OR Prostreno OR #prostřeno OR #prostreno OR #Prostřeno OR #Prostreno"
 
 # For each time period, fetch tweets matching the query
-for start_time, end_time in time_periods:
+for i, (start_time, end_time) in enumerate(time_periods, start=1):
+    start_time_period = time.time()
     next_token = None
     while True:
         params = {
@@ -107,6 +108,16 @@ for start_time, end_time in time_periods:
 
         # Wait for 2 seconds before making another request
         time.sleep(0.5)
+
+    end_time_period = time.time()
+    elapsed_time_period = end_time_period - start_time_period
+    remaining_time_periods = len(time_periods) - i
+    estimated_remaining_time = remaining_time_periods * elapsed_time_period
+
+    print(
+        f"Finished time period {i} of {len(time_periods)}. "
+        f"Estimated time remaining: {estimated_remaining_time} seconds."
+    )
 
 # Commit the changes and close the session
 session.commit()

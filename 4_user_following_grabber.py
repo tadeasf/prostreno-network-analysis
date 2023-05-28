@@ -10,6 +10,8 @@ engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME
 Session = sessionmaker(bind=engine)
 session = Session()
 
+# Create the tables in the database
+Base.metadata.create_all(engine)
 # Define the URL and headers for the Twitter API request
 headers = {
     "Authorization": f"Bearer {BEARER_TOKEN}",
@@ -19,8 +21,11 @@ headers = {
 # Fetch all users from the database
 users = session.query(User).all()
 
+# Initialize the start time
+start_time = time.time()
+
 # For each user, fetch the users they are following from the Twitter API
-for user in users:
+for i, user in enumerate(users, start=1):
     url = f"https://api.twitter.com/2/users/{user.id}/following"
     params = {
         "max_results": 100,
@@ -53,6 +58,16 @@ for user in users:
             params["pagination_token"] = data["meta"]["next_token"]
         else:
             break
+
+        # Calculate elapsed time and estimated time remaining
+        elapsed_time = time.time() - start_time
+        remaining_users = len(users) - i
+        estimated_time_remaining = (elapsed_time / i) * remaining_users
+
+        print(
+            f"Processed user {i} of {len(users)}. "
+            f"Estimated time remaining: {estimated_time_remaining} seconds."
+        )
 
         # Wait for a second before making another request
         time.sleep(0.5)
