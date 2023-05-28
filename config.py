@@ -7,7 +7,12 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
-
+API_KEY2 = os.getenv("API_KEY2")
+API_SECRET2 = os.getenv("API_SECRET2")
+BEARER_TOKEN2 = os.getenv("BEARER_TOKEN2")
+API_KEY3 = os.getenv("API_KEY3")
+API_SECRET3 = os.getenv("API_SECRET3")
+BEARER_TOKEN3 = os.getenv("BEARER_TOKEN3")
 # Get the database credentials from the .env file
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")

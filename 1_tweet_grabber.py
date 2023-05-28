@@ -103,11 +103,8 @@ for i, (start_time, end_time) in enumerate(time_periods, start=1):
         else:
             break
 
-        # Commit the changes after each request
-        session.commit()
-
-        # Wait for 2 seconds before making another request
-        time.sleep(0.5)
+        # Wait for 1 seconds before making another request
+        time.sleep(1)
 
     end_time_period = time.time()
     elapsed_time_period = end_time_period - start_time_period

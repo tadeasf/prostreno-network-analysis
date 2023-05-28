@@ -2,7 +2,15 @@ import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base, User, Tweet
-from config import BEARER_TOKEN, DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
+from config import (
+    BEARER_TOKEN,
+    BEARER_TOKEN2,
+    BEARER_TOKEN3,
+    DB_HOST,
+    DB_USER,
+    DB_PASSWORD,
+    DB_NAME,
+)
 import time
 
 # Set up the database engine and session
@@ -13,15 +21,21 @@ session = Session()
 # Create the tables in the database
 Base.metadata.create_all(engine)
 
-# Define the URL and headers for the Twitter API request
-headers = {
-    "Authorization": f"Bearer {BEARER_TOKEN}",
-    "Content-Type": "application/json",
-}
-
 # Fetch all users from the database
 users = session.query(User).all()
 total_users = len(users)
+
+# Put all the bearer tokens in a list
+bearer_tokens = [BEARER_TOKEN, BEARER_TOKEN2, BEARER_TOKEN3]
+
+# Initialize a counter to keep track of the current token
+current_token = 0
+
+# Define your escalating timeout durations (in seconds)
+timeouts = [5, 10, 30, 60, 5 * 60, 10 * 60, 15 * 60]
+
+# Initialize a counter for the current timeout
+current_timeout = 0
 
 # For each user, fetch their tweets from the Twitter API
 for i, user in enumerate(users, start=1):
@@ -32,11 +46,28 @@ for i, user in enumerate(users, start=1):
         "max_results": 100,
     }
     while True:
+        headers = {
+            "Authorization": f"Bearer {bearer_tokens[current_token]}",
+            "Content-Type": "application/json",
+        }
         response = requests.get(url, headers=headers, params=params)
-        # If the status code is 429, wait for 15 minutes before making another request
+
+        # If the status code is 429, switch the token
         if response.status_code == 429:
-            print("Rate limit reached. Waiting for 15 minutes.")
-            time.sleep(900)  # 15 minutes
+            print(
+                "Rate limit reached. Switching tokens, committing changes, and escalating timeout."
+            )
+            try:
+                session.commit()
+            except Exception as e:
+                print(e)
+            current_token = (current_token + 1) % len(bearer_tokens)
+
+            # Use the current timeout, then increment the timeout counter (unless it's already at the end of the list)
+            time.sleep(timeouts[current_timeout])
+            if current_timeout < len(timeouts) - 1:
+                current_timeout += 1
+
             continue
 
         # If the status code is not 200, print the error and break the loop
@@ -75,10 +106,10 @@ for i, user in enumerate(users, start=1):
             break
 
         # Wait for a second before making another request
-        time.sleep(1)
+        time.sleep(0.1)
 
     # Commit the changes for each user
-    session.commit()
+    print(f"Committing changes for user {user.id}.")
 
     # Print progress
     elapsed_time = time.time() - start_time
@@ -89,4 +120,8 @@ for i, user in enumerate(users, start=1):
     )
 
 # Close the session
+try:
+    session.commit()
+except Exception as e:
+    print(e)
 session.close()
