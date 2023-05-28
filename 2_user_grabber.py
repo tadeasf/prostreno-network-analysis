@@ -9,7 +9,8 @@ import time
 engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}")
 Session = sessionmaker(bind=engine)
 session = Session()
-
+# Create the tables in the database
+Base.metadata.create_all(engine)
 # Define the URL and headers for the Twitter API request
 url = "https://api.twitter.com/2/users"
 headers = {
@@ -20,7 +21,7 @@ headers = {
 # Fetch all users from the database
 users = session.query(User).all()
 
-# For each user, fetch their data from the Twitter API
+# For each user, fetch their data from the Twitter API and update the database
 for user in users:
     params = {
         "ids": user.id,
@@ -37,21 +38,30 @@ for user in users:
     if response.status_code != 200:
         print(f"Error: {response.status_code}, {response.text}")
         break
-    data = response.json()
 
+    data = response.json()
+    print(data)
     # Update the user data in the database
     if "data" in data:
-        for user_data in data["data"]:
-            user.description = user_data.get("description")
-            user.location = user_data.get("location")
-            user.followers_count = user_data["public_metrics"]["followers_count"]
-            user.following_count = user_data["public_metrics"]["following_count"]
-            user.tweet_count = user_data["public_metrics"]["tweet_count"]
-            user.created_at = user_data["created_at"]
+        user_data = data["data"][0]
+        user.description = user_data.get("description")
+        user.location = user_data.get("location")
+        user.followers_count = user_data["public_metrics"]["followers_count"]
+        user.following_count = user_data["public_metrics"]["following_count"]
+        user.tweet_count = user_data["public_metrics"]["tweet_count"]
+        user.created_at = user_data["created_at"]
+
+        try:
+            session.commit()
+        except Exception as e:
+            print(e)
 
     # Wait for a second before making another request
-    time.sleep(0.5)
+    time.sleep(1)
 
 # Commit the changes and close the session
-session.commit()
+try:
+    session.commit()
+except Exception as e:
+    print(e)
 session.close()
