@@ -55,7 +55,7 @@ for i, user in enumerate(users, start=1):
         # If the status code is 429, switch the token
         if response.status_code == 429:
             print(
-                f"Rate limit reached. Switching tokens, committing changes, and escalating timeout: {timeouts[current_timeout]}"
+                f"Rate limit reached. Switching tokens, committing changes, and escalating timeout: {timeouts[current_timeout]} seconds"
             )
             try:
                 session.commit()
