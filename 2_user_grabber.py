@@ -75,7 +75,9 @@ for i, user in enumerate(users, start=1):
         print(f"Error: {response.status_code}, {response.text}")
         break
 
+    # Get the user data from the JSON response
     data = response.json()
+
     # Update the user data in the database
     if "data" in data:
         user_data = data["data"][0]
@@ -85,6 +87,9 @@ for i, user in enumerate(users, start=1):
         user.following_count = user_data["public_metrics"]["following_count"]
         user.tweet_count = user_data["public_metrics"]["tweet_count"]
         user.created_at = user_data["created_at"]
+
+        # Reset the timeout counter after successful data retrieval and processing
+        current_timeout = 0
 
         try:
             print(f"Processed user {i} of {len(users)}")

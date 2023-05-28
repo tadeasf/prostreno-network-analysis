@@ -73,6 +73,8 @@ for i, user in enumerate(users, start=1):
         data = response.json()
 
         # For each follower, store it in the database
+        # Reset the timeout counter after successful data retrieval and processing
+        current_timeout = 0
         if "data" in data:
             for follower_data in data["data"]:
                 follower = Follower(

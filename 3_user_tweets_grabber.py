@@ -77,6 +77,8 @@ for i, user in enumerate(users, start=1):
         data = response.json()
 
         # For each tweet, store it in the database
+        # Reset the timeout counter after successful data retrieval and processing
+        current_timeout = 0
         if "data" in data:
             for tweet_data in data["data"]:
                 # Check if the tweet already exists in the database
