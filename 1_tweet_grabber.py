@@ -22,7 +22,7 @@ headers = {
 
 # Define the time periods to fetch tweets for
 time_periods = [
-    ("2010-03-01T00:00:00Z", "2023-05-26T00:00:00Z"),
+    ("2022-01-01T00:00:00Z", "2023-05-26T00:00:00Z"),
 ]
 
 # Define the query to search for tweets containing any of the specified keywords
