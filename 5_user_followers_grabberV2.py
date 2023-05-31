@@ -77,14 +77,12 @@ for i, user in enumerate(users, start=1):
         client = tweepy.Client(
             bearer_token=bearer_tokens[current_token],
             wait_on_rate_limit=True,
-            wait_on_rate_limit_notify=True,
         )
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# Commit the changes and close the session
-try:
+    # Commit the changes after processing each user
     session.commit()
-except Exception as e:
-    print(e)
+
+# Close the session
 session.close()
