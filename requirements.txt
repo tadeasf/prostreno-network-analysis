@@ -4,4 +4,11 @@ psycopg2
 sqlalchemy
 time
 tweepy
+neo4j
+vaderSentiment
+gensim
+requests
+alembic
+translators
+bertopic
 ```

@@ -69,17 +69,18 @@ for i, user in enumerate(users, start=1):
             f"Estimated time remaining: {estimated_time_remaining} seconds."
         )
 
-    except tweepy.RateLimitError:
-        print(f"Rate limit reached with current token. Switching tokens.")
-        current_token = (current_token + 1) % len(bearer_tokens)
-
-        # Update the client with the new token
-        client = tweepy.Client(
-            bearer_token=bearer_tokens[current_token],
-            wait_on_rate_limit=True,
-        )
     except Exception as e:
-        print(f"An error occurred: {e}")
+        if "Rate limit exceeded" in str(e):
+            print(f"Rate limit reached with current token. Switching tokens.")
+            current_token = (current_token + 1) % len(bearer_tokens)
+
+            # Update the client with the new token
+            client = tweepy.Client(
+                bearer_token=bearer_tokens[current_token],
+                wait_on_rate_limit=True,
+            )
+        else:
+            print(f"An error occurred: {e}")
 
     # Commit the changes after processing each user
     session.commit()

@@ -1,4 +1,9 @@
 .env
 __pycache__/
 .DS_Store
+alembic/
+alembic.ini
+test.py
+test-translate.py
+char_count.py
 ```
