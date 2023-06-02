@@ -44,8 +44,8 @@ def import_data_to_neo4j(data):
             # Remove existing data from the Neo4j database
             session.run("MATCH (n) DETACH DELETE n")
 
-        # Create nodes for users and tweets
-        for table_name in ["users", "tweets"]:
+        # Create nodes for users, tweets, topics, followers, and following
+        for table_name in ["users", "tweets", "topics", "followers", "following"]:
             for row in data[table_name]["rows"]:
                 row_dict = row._asdict()
                 properties = {
@@ -72,7 +72,7 @@ def import_data_to_neo4j(data):
         for row in data["tweet_topics"]["rows"]:
             row_dict = row._asdict()
             session.run(
-                "MATCH (t:tweets), (topic:Topic) "
+                "MATCH (t:tweets), (topic:topics) "
                 "WHERE t.id = $tweet_id AND topic.id = $topic_id "
                 "CREATE (t)-[:HAS_TOPIC]->(topic)",
                 tweet_id=row_dict["tweet_id"],
@@ -83,7 +83,7 @@ def import_data_to_neo4j(data):
         for row in data["user_topics"]["rows"]:
             row_dict = row._asdict()
             session.run(
-                "MATCH (u:users), (topic:Topic) "
+                "MATCH (u:users), (topic:topics) "
                 "WHERE u.id = $user_id AND topic.id = $topic_id "
                 "CREATE (u)-[:INTERESTED_IN {weight: $weight}]->(topic)",
                 user_id=row_dict["user_id"],
@@ -91,12 +91,33 @@ def import_data_to_neo4j(data):
                 weight=row_dict["weight"],
             )
 
+        # Create relationships between users for followers and following
+        for row in data["followers"]["rows"]:
+            row_dict = row._asdict()
+            session.run(
+                "MATCH (u1:users), (u2:users) "
+                "WHERE u1.id = $user_id AND u2.id = $follower_id "
+                "CREATE (u1)-[:FOLLOWS]->(u2)",
+                user_id=row_dict["user_id"],
+                follower_id=row_dict["follower_id"],
+            )
+
+        for row in data["following"]["rows"]:
+            row_dict = row._asdict()
+            session.run(
+                "MATCH (u1:users), (u2:users) "
+                "WHERE u1.id = $user_id AND u2.id = $following_id "
+                "CREATE (u1)-[:FOLLOWS]->(u2)",
+                user_id=row_dict["user_id"],
+                following_id=row_dict["following_id"],
+            )
+
         # Add sentiment_analysis as a property to the HAS_TOPIC relationship
         for row in data["tweets"]["rows"]:
             row_dict = row._asdict()
             if row_dict["sentiment_analysis"]:
                 session.run(
-                    "MATCH (t:tweets)-[r:HAS_TOPIC]->(topic:Topic) "
+                    "MATCH (t:tweets)-[r:HAS_TOPIC]->(topic:topics) "
                     "WHERE t.id = $tweet_id "
                     "SET r.sentiment_analysis = $sentiment_analysis",
                     tweet_id=row_dict["id"],
