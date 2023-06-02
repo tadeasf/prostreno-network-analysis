@@ -37,6 +37,13 @@ def extract_data_from_postgresql():
 def import_data_to_neo4j(data):
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
     with driver.session() as session:
+        # Check if the Neo4j database is empty
+        result = session.run("MATCH (n) RETURN count(n) AS count")
+        count = result.single()["count"]
+        if count > 0:
+            # Remove existing data from the Neo4j database
+            session.run("MATCH (n) DETACH DELETE n")
+
         # Create nodes for users and tweets
         for table_name in ["users", "tweets"]:
             for row in data[table_name]["rows"]:
@@ -61,18 +68,32 @@ def import_data_to_neo4j(data):
                 tweet_id=row_dict["id"],
             )
 
-            # Create relationships between tweets and topics
-            if row_dict["topic"]:
-                session.run(
-                    "MATCH (t:tweets) "
-                    "WHERE t.id = $tweet_id "
-                    "MERGE (topic:Topic {name: $topic_name}) "
-                    "CREATE (t)-[:HAS_TOPIC]->(topic)",
-                    tweet_id=row_dict["id"],
-                    topic_name=row_dict["topic"],
-                )
+        # Create relationships between tweets and topics
+        for row in data["tweet_topics"]["rows"]:
+            row_dict = row._asdict()
+            session.run(
+                "MATCH (t:tweets), (topic:Topic) "
+                "WHERE t.id = $tweet_id AND topic.id = $topic_id "
+                "CREATE (t)-[:HAS_TOPIC]->(topic)",
+                tweet_id=row_dict["tweet_id"],
+                topic_id=row_dict["topic_id"],
+            )
 
-            # Add sentiment_analysis as a property to the HAS_TOPIC relationship
+        # Create relationships between users and topics with weights
+        for row in data["user_topics"]["rows"]:
+            row_dict = row._asdict()
+            session.run(
+                "MATCH (u:users), (topic:Topic) "
+                "WHERE u.id = $user_id AND topic.id = $topic_id "
+                "CREATE (u)-[:INTERESTED_IN {weight: $weight}]->(topic)",
+                user_id=row_dict["user_id"],
+                topic_id=row_dict["topic_id"],
+                weight=row_dict["weight"],
+            )
+
+        # Add sentiment_analysis as a property to the HAS_TOPIC relationship
+        for row in data["tweets"]["rows"]:
+            row_dict = row._asdict()
             if row_dict["sentiment_analysis"]:
                 session.run(
                     "MATCH (t:tweets)-[r:HAS_TOPIC]->(topic:Topic) "
@@ -80,20 +101,6 @@ def import_data_to_neo4j(data):
                     "SET r.sentiment_analysis = $sentiment_analysis",
                     tweet_id=row_dict["id"],
                     sentiment_analysis=row_dict["sentiment_analysis"],
-                )
-
-        # Create relationships between users based on following and followers tables
-        for table_name in ["following", "followers"]:
-            for row in data[table_name]["rows"]:
-                row_dict = row._asdict()
-                session.run(
-                    "MATCH (u1:users), (u2:users) "
-                    "WHERE u1.id = $id1 AND u2.id = $id2 "
-                    f"CREATE (u1)-[:{table_name.upper()}]->(u2)",
-                    id1=row_dict["user_id"],
-                    id2=row_dict["follower_id"]
-                    if table_name == "followers"
-                    else row_dict["following_id"],
                 )
 
     driver.close()
