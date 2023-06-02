@@ -61,6 +61,27 @@ def import_data_to_neo4j(data):
                 tweet_id=row_dict["id"],
             )
 
+            # Create relationships between tweets and topics
+            if row_dict["topic"]:
+                session.run(
+                    "MATCH (t:tweets) "
+                    "WHERE t.id = $tweet_id "
+                    "MERGE (topic:Topic {name: $topic_name}) "
+                    "CREATE (t)-[:HAS_TOPIC]->(topic)",
+                    tweet_id=row_dict["id"],
+                    topic_name=row_dict["topic"],
+                )
+
+            # Add sentiment_analysis as a property to the HAS_TOPIC relationship
+            if row_dict["sentiment_analysis"]:
+                session.run(
+                    "MATCH (t:tweets)-[r:HAS_TOPIC]->(topic:Topic) "
+                    "WHERE t.id = $tweet_id "
+                    "SET r.sentiment_analysis = $sentiment_analysis",
+                    tweet_id=row_dict["id"],
+                    sentiment_analysis=row_dict["sentiment_analysis"],
+                )
+
         # Create relationships between users based on following and followers tables
         for table_name in ["following", "followers"]:
             for row in data[table_name]["rows"]:

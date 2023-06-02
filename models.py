@@ -66,6 +66,38 @@ class Follower(Base):
     user = relationship("User", back_populates="followers")
 
 
+class Topic(Base):
+    __tablename__ = "topics"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic = Column(String)
+
+    tweets = relationship("TweetTopic", back_populates="topic")
+
+
+class TweetTopic(Base):
+    __tablename__ = "tweet_topics"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tweet_id = Column(String, ForeignKey("tweets.id"))
+    topic_id = Column(Integer, ForeignKey("topics.id"))
+
+    tweet = relationship("Tweet")
+    topic = relationship("Topic")
+
+
+class UserTopic(Base):
+    __tablename__ = "user_topics"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    topic_id = Column(Integer, ForeignKey("topics.id"))
+    weight = Column(Integer)
+
+    user = relationship("User")
+    topic = relationship("Topic")
+
+
 # Function to modify all schemas
 def modify_all_schemas(database_url):
     # Create the SQLAlchemy engine
