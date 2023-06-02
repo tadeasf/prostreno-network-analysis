@@ -17,6 +17,8 @@ from gensim.parsing.preprocessing import (
     remove_stopwords,
     strip_short,
 )
+from concurrent.futures import ThreadPoolExecutor
+import re
 
 # Initialize sentiment analyzer
 analyzer = SentimentIntensityAnalyzer()
@@ -32,13 +34,31 @@ session = DBSession()
 
 # Fetch all tweets
 tweets = session.query(Tweet).all()
-total_tweets = len(tweets)
-processed_tweets = 0
+# Fetch tweets where translation didn't fail
+tweets = session.query(Tweet).filter(Tweet.text_en_transl != "translation failed").all()
 
 # Prepare corpus for topic modeling
 texts = []
 
-# Custom preprocessors
+
+# Preprocessing functions
+def remove_rt(text):
+    """Remove the retweet symbol 'RT'."""
+    return re.sub(r"\bRT\b", "", text)
+
+
+def remove_links(text):
+    """Remove hyperlinks from the text."""
+    return re.sub(r"http\S+|www.\S+", "", text)
+
+
+def remove_common_words(text):
+    """Remove overly common words."""
+    common_words = {"the", "a", "an", "and", "of", "is", "it", "that", "but", "this"}
+    return " ".join([word for word in text.split() if word not in common_words])
+
+
+# Update Custom preprocessors
 CUSTOM_FILTERS = [
     lambda x: x.lower(),
     strip_tags,
@@ -46,114 +66,81 @@ CUSTOM_FILTERS = [
     strip_numeric,
     remove_stopwords,
     strip_short,
+    remove_rt,
+    remove_links,
+    remove_common_words,
 ]
-
-# Translation progress tracking
-print("Translation Progress:")
-start_time = time.time()
-for tweet in tweets:
+# Translation phase
+print("Translation Phase:")
+for tweet in session.query(Tweet).filter(Tweet.text_en_transl.is_(None)).all():
     try:
-        # Check if translation already exists
-        if tweet.text_en_transl:
-            translated_text = tweet.text_en_transl
-        else:
-            # Translate tweet text to English using DeepL API
-            try:
-                translated_text = ts.translate_text(
-                    query_text=tweet.text,
-                    from_language="cs",
-                    to_language="en",
-                    translator="deepl",
-                )
-            except Exception:
-                # If DeepL fails, use Bing for translation
-                try:
-                    translated_text = ts.translate_text(
-                        query_text=tweet.text,
-                        from_language="cs",
-                        to_language="en",
-                        translator="bing",
-                    )
-                except Exception:
-                    # If Bing also fails, use Google for translation
-                    translated_text = ts.translate_text(
-                        query_text=tweet.text,
-                        from_language="cs",
-                        to_language="en",
-                        translator="google",
-                    )
-
-            # Save the translated text in the database
-            tweet.text_en_transl = translated_text
-            # Add preprocessed text to corpus for topic modeling
-            preprocessed_text = " ".join(
-                preprocess_string(translated_text, CUSTOM_FILTERS)
-            )
-            texts.append(preprocessed_text)
-        # Perform sentiment analysis
-        sentiment = analyzer.polarity_scores(translated_text)
-        tweet.sentiment_analysis = sentiment["compound"]
-
-        # Preprocess the translated text for topic modeling
-        words = simple_preprocess(
-            translated_text, deacc=True
-        )  # deacc=True removes punctuations
-        words = [lemmatizer.lemmatize(word) for word in words if word not in STOPWORDS]
-
-        # Add preprocessed text to corpus for topic modeling
-        texts.append(words)
-
-        processed_tweets += 1
-        remaining_tweets = total_tweets - processed_tweets
-        elapsed_time = time.time() - start_time
-        time_per_tweet = elapsed_time / processed_tweets
-        remaining_time = remaining_tweets * time_per_tweet
-
-        print(
-            f"Processed tweets: {processed_tweets}/{total_tweets}, Remaining tweets: {remaining_tweets}, Estimated remaining time: {remaining_time:.2f} seconds"
+        translated_text = ts.translate_text(
+            query_text=tweet.text,
+            from_language="cs",
+            to_language="en",
+            translator="deepl",
         )
-    except Exception as e:
-        print(f"An error occurred for tweet ID {tweet.id}: {e}")
+        tweet.text_en_transl = translated_text
+    except Exception:
+        print(f"An error occurred during translation for tweet ID {tweet.id}")
+        tweet.text_en_transl = "translation failed"
 
-# Update the database with sentiment analysis results
 session.commit()
 
-# Perform topic modeling using BERTopic
-try:
-    # Initialize BERTopic
-    topic_model = BERTopic(language="english")
+# Sentiment Analysis Phase
+print("Sentiment Analysis Phase:")
+for tweet in (
+    session.query(Tweet)
+    .filter(
+        Tweet.sentiment_analysis.is_(None), Tweet.text_en_transl != "translation failed"
+    )
+    .all()
+):
+    try:
+        sentiment = analyzer.polarity_scores(tweet.text_en_transl)
+        tweet.sentiment_analysis = sentiment["compound"]
+    except Exception:
+        print(f"An error occurred during sentiment analysis for tweet ID {tweet.id}")
 
-    # Perform topic modeling
+session.commit()
+
+# Preprocess text for topic modeling
+for tweet in (
+    session.query(Tweet).filter(Tweet.text_en_transl != "translation failed").all()
+):
+    try:
+        # Update this block to use custom filters
+        preprocessed_text = preprocess_string(tweet.text_en_transl, CUSTOM_FILTERS)
+        words = simple_preprocess(" ".join(preprocessed_text), deacc=True)
+        words = [lemmatizer.lemmatize(word) for word in words if word not in STOPWORDS]
+        # Join words into a sentence and append
+        texts.append(" ".join(words))
+    except Exception:
+        print(f"An error occurred during preprocessing for tweet ID {tweet.id}")
+
+
+# Topic Modeling Phase
+print("Topic Modeling Phase:")
+try:
+    topic_model = BERTopic(language="english")
     topics, _ = topic_model.fit_transform(texts)
 
-    # Topic recognition progress tracking
-    print("Topic Recognition Progress:")
-    start_time = time.time()
-    for i, tweet in enumerate(tweets):
+    # Assign topics
+    def assign_topic(tweet, topic_id):
         try:
-            # Assign the topic with the highest probability
-            topic_id = topics[i]
-            # Get the top 5 words contributing to this topic
-            topic_words = topic_model.get_topic(topic_id, top_n=5)
+            topic_words = topic_model.get_topic(topic_id)
             if topic_words:
-                # Convert the topic words to a string and assign it to the tweet
-                tweet.topic = ", ".join([word for word, _ in topic_words])
-
-            processed_tweets += 1
-            remaining_tweets = total_tweets - processed_tweets
-            elapsed_time = time.time() - start_time
-            time_per_tweet = elapsed_time / (i + 1)
-            remaining_time = remaining_tweets * time_per_tweet
-
+                tweet.topic = ", ".join([word[0] for word in topic_words])
+        except Exception:
             print(
-                f"Processed tweets: {processed_tweets}/{total_tweets}, Remaining tweets: {remaining_tweets}, Estimated remaining time: {remaining_time:.2f} seconds"
-            )
-        except Exception as e:
-            print(
-                f"An error occurred while assigning topic for tweet ID {tweet.id}: {e}"
+                f"An error occurred while assigning topic for tweet ID {tweet.id}. Error is: {e}"
             )
 
-    # Update the database with topic assignments
-    session.commit()
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for tweet, topic_id in zip(tweets, topics):
+            executor.submit(assign_topic, tweet, topic_id)
+
 except Exception as e:
     print(f"An error occurred during topic modeling: {e}")
+
+session.commit()
