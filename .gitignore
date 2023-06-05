@@ -6,4 +6,7 @@ alembic.ini
 test.py
 test-translate.py
 char_count.py
+topic_graph.gexf
+twitter_data.gexf
+twitter_data.json
 ```

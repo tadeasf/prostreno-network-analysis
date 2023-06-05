@@ -24,6 +24,7 @@ class User(Base):
     tweets = relationship("Tweet", back_populates="user")
     following = relationship("Following", back_populates="user")
     followers = relationship("Follower", back_populates="user")
+    user_topics = relationship("UserTopic", back_populates="user")  # new field
 
 
 class Tweet(Base):
@@ -94,7 +95,7 @@ class UserTopic(Base):
     topic_id = Column(Integer, ForeignKey("topics.id"))
     weight = Column(Integer)
 
-    user = relationship("User")
+    user = relationship("User", back_populates="user_topics")  # new field
     topic = relationship("Topic")
 
 
